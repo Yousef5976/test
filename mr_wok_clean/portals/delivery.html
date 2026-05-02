@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Mr. Wok — Delivery Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{
+  --bg:#080c0a;--surface:#111713;--surface2:#192018;--surface3:#222e24;
+  --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);
+  --text:#eef4ee;--muted:#7a9480;
+  --accent:#22c55e;--accent2:#4ade80;--blue:#3b82f6;
+  --orange:#f97316;--red:#ef4444;--gold:#f59e0b;
+  --font-display:'Syne',sans-serif;--font-body:'DM Sans',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;}
+
+/* LOGIN */
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at 40% 40%,rgba(34,197,94,.07),transparent 60%),var(--bg);}
+.login-card{width:360px;padding:44px 36px;background:var(--surface);border:1px solid var(--border2);border-radius:20px;box-shadow:0 40px 80px rgba(0,0,0,.6);}
+.login-logo{font-family:var(--font-display);font-size:26px;font-weight:800;margin-bottom:6px;}
+.login-logo span{color:var(--accent);}
+.login-sub{color:var(--muted);font-size:13px;margin-bottom:28px;}
+.fg{margin-bottom:16px;}
+.fg label{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px;}
+.fg input{width:100%;padding:11px 14px;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;color:var(--text);font-size:14px;font-family:var(--font-body);outline:none;transition:border-color .2s;}
+.fg input:focus{border-color:var(--accent);}
+.btn-login{width:100%;padding:13px;background:var(--accent);color:#000;border:none;border-radius:10px;font-size:15px;font-weight:700;font-family:var(--font-display);cursor:pointer;transition:all .2s;margin-top:6px;}
+.btn-login:hover{background:var(--accent2);}
+.login-error{color:var(--red);font-size:13px;margin-top:10px;text-align:center;display:none;}
+
+/* APP */
+#app{display:none;min-height:100vh;}
+
+nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:200;}
+.nav-logo{font-family:var(--font-display);font-size:17px;font-weight:800;}
+.nav-logo span{color:var(--accent);}
+.user-chip{padding:4px 12px;background:var(--surface2);border:1px solid var(--border2);border-radius:20px;font-size:12px;font-weight:600;color:var(--accent);}
+.nav-right{display:flex;gap:8px;align-items:center;}
+.btn-sm{padding:6px 13px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font-body);transition:all .2s;}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.lang-btn{padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;}
+.lang-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* MAIN LAYOUT */
+.main{display:grid;grid-template-columns:380px 1fr;min-height:calc(100vh - 58px);}
+@media(max-width:800px){.main{grid-template-columns:1fr;}}
+.sidebar{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;}
+.map-area{position:relative;}
+#delivery-map{height:100%;min-height:400px;width:100%;}
+
+/* SIDEBAR SECTIONS */
+.sb-section{padding:18px 20px;border-bottom:1px solid var(--border);}
+.sb-title{font-family:var(--font-display);font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:14px;}
+
+/* READY ORDERS */
+.ready-card{
+  background:var(--surface2);border:1px solid var(--border2);border-radius:12px;
+  padding:14px;margin-bottom:10px;transition:border-color .2s;
+}
+.ready-card:hover{border-color:rgba(34,197,94,.3);}
+.ready-ref{font-family:monospace;font-size:12px;font-weight:700;color:var(--gold);}
+.ready-name{font-weight:700;margin-top:4px;}
+.ready-area{font-size:12px;color:var(--muted);margin-top:2px;}
+.ready-total{font-size:14px;font-weight:700;color:var(--accent);margin-top:8px;}
+.btn-accept-delivery{
+  width:100%;margin-top:10px;padding:10px;
+  background:var(--accent);color:#000;
+  border:none;border-radius:9px;font-size:13px;font-weight:700;
+  font-family:var(--font-display);cursor:pointer;transition:all .2s;
+}
+.btn-accept-delivery:hover{background:var(--accent2);}
+
+/* ACTIVE DELIVERY */
+.active-order-card{background:var(--surface2);border:1px solid rgba(34,197,94,.3);border-radius:12px;padding:16px;}
+.active-ref{font-family:monospace;font-size:13px;font-weight:700;color:var(--gold);}
+.active-name{font-size:16px;font-weight:800;margin-top:6px;}
+.active-address{font-size:13px;color:var(--muted);margin-top:4px;}
+.active-items{margin-top:10px;display:flex;flex-direction:column;gap:5px;}
+.active-item{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;}
+
+/* CALL BUTTON */
+.btn-call{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  width:100%;padding:11px;margin-top:12px;
+  background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);
+  color:var(--blue);border-radius:10px;font-size:14px;font-weight:700;
+  font-family:var(--font-display);cursor:pointer;text-decoration:none;
+  transition:all .2s;
+}
+.btn-call:hover{background:rgba(59,130,246,.25);}
+
+/* ETA */
+.eta-box{
+  background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);
+  border-radius:10px;padding:12px 14px;margin-top:12px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.eta-label{font-size:12px;color:var(--muted);}
+.eta-value{font-family:var(--font-display);font-size:22px;font-weight:800;color:var(--accent);}
+
+/* GPS TOGGLE */
+.gps-row{display:flex;align-items:center;justify-content:space-between;margin-top:12px;}
+.gps-label{font-size:13px;font-weight:600;}
+.gps-badge{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;}
+.gps-on{background:rgba(34,197,94,.15);color:var(--accent);}
+.gps-off{background:rgba(239,68,68,.15);color:var(--red);}
+.btn-gps{
+  padding:9px 18px;border-radius:9px;border:none;cursor:pointer;
+  font-size:13px;font-weight:700;font-family:var(--font-display);transition:all .2s;
+}
+.btn-gps-start{background:var(--accent);color:#000;}
+.btn-gps-stop{background:rgba(239,68,68,.2);color:var(--red);border:1px solid rgba(239,68,68,.3);}
+
+/* DELIVERED BUTTON */
+.btn-delivered{
+  width:100%;padding:14px;margin-top:14px;
+  background:var(--gold);color:#000;
+  border:none;border-radius:10px;font-size:15px;font-weight:800;
+  font-family:var(--font-display);cursor:pointer;transition:all .2s;
+}
+.btn-delivered:hover{filter:brightness(1.1);}
+
+/* CHAT */
+.chat-box{display:flex;flex-direction:column;height:240px;}
+.chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:4px 0;margin-bottom:10px;}
+.chat-msg{max-width:80%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.4;}
+.msg-me{align-self:flex-end;background:var(--accent);color:#000;border-radius:12px 12px 2px 12px;}
+.msg-other{align-self:flex-start;background:var(--surface3);color:var(--text);border-radius:12px 12px 12px 2px;}
+.msg-time{font-size:10px;opacity:.6;margin-top:3px;}
+.chat-input-row{display:flex;gap:8px;}
+.chat-input{flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:10px 12px;border-radius:10px;font-size:13px;font-family:var(--font-body);outline:none;}
+.chat-input:focus{border-color:var(--accent);}
+.btn-send{padding:10px 16px;background:var(--accent);color:#000;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;}
+.chat-locked{text-align:center;color:var(--muted);font-size:13px;padding:20px 0;}
+.msg-bubble{line-height:1.4;}
+.msg-status{font-size:10px;margin-left:5px;opacity:0.7;}
+.msg-me .msg-time{text-align:right;}
+.msg-other .msg-time{text-align:left;}
+
+/* EMPTY */
+.empty{text-align:center;padding:30px 20px;color:var(--muted);}
+.empty-icon{font-size:40px;margin-bottom:8px;}
+
+/* AVAILABILITY TOGGLE */
+.avail-toggle{display:flex;align-items:center;gap:10px;}
+.toggle-track{width:46px;height:26px;border-radius:13px;cursor:pointer;position:relative;transition:background .25s;border:none;padding:0;background:rgba(239,68,68,.4);}
+.toggle-track.on{background:var(--accent);}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .25s;box-shadow:0 1px 4px rgba(0,0,0,.3);}
+.toggle-track.on .toggle-thumb{transform:translateX(20px);}
+.avail-label{font-size:13px;font-weight:700;}
+.avail-label.online{color:var(--accent);}
+.avail-label.break{color:var(--orange);}
+
+/* TOAST */
+#toasts{position:fixed;top:70px;right:16px;z-index:999;display:flex;flex-direction:column;gap:8px;}
+.toast{background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:12px 16px;font-size:13px;font-weight:600;min-width:240px;box-shadow:0 8px 24px rgba(0,0,0,.5);animation:slideIn .3s ease;}
+.toast-new{border-left:3px solid var(--orange);}
+.toast-ok{border-left:3px solid var(--accent);}
+@keyframes slideIn{from{transform:translateX(100px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🛵 <span>Delivery</span> Portal</div>
+    <div class="login-sub">Mr. Wok Delivery Team</div>
+    <div class="fg"><label>Username</label><input type="text" id="lu" autocomplete="username"/></div>
+    <div class="fg"><label>Password</label><input type="password" id="lp" autocomplete="current-password"/></div>
+    <button class="btn-login" id="btn-login">Sign In</button>
+    <div class="login-error" id="lerr">Invalid credentials</div>
+  </div>
+</div>
+
+<div id="app">
+  <nav>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="nav-logo">🛵 <span>Delivery</span></div>
+      <div class="user-chip" id="user-chip">DLV-001</div>
+    </div>
+    <div class="nav-right">
+      <div class="avail-toggle">
+        <button class="toggle-track" id="avail-track" onclick="toggleAvailability()">
+          <div class="toggle-thumb"></div>
+        </button>
+        <span class="avail-label online" id="avail-label">Online</span>
+      </div>
+      <button class="lang-btn" onclick="toggleLang()" id="lang-btn">عربي</button>
+      <button class="btn-sm btn-ghost" onclick="logout()">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="main">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+
+      <!-- READY ORDERS -->
+      <div class="sb-section" id="ready-section">
+        <div class="sb-title" id="sb-ready-title">Ready for Pickup</div>
+        <div id="ready-list"></div>
+      </div>
+
+      <!-- ACTIVE DELIVERY -->
+      <div class="sb-section" id="active-section" style="display:none;">
+        <div class="sb-title" id="sb-active-title">Active Delivery</div>
+        <div id="active-delivery-content"></div>
+      </div>
+
+      <!-- CHAT -->
+      <div class="sb-section" id="chat-section">
+        <div class="sb-title" id="sb-chat-title">Chat with Customer</div>
+        <div class="chat-box">
+          <div class="chat-messages" id="chat-messages"></div>
+          <div class="chat-input-row" id="chat-input-row" style="display:none;">
+            <input class="chat-input" id="chat-input" placeholder="Type a message…"/>
+            <button class="btn-send" onclick="sendChat()">➤</button>
+          </div>
+          <div class="chat-locked" id="chat-locked">Chat available after accepting a delivery</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- MAP -->
+    <div class="map-area">
+      <div id="delivery-map"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+const i18n = {
+  en:{ ready:'Ready for Pickup', active:'Active Delivery', chat:'Chat with Customer', accept:'Accept Delivery', call:'Call Customer', start_gps:'Start Sharing Location', stop_gps:'Stop Sharing', delivered:'Mark as Delivered', eta_label:'Estimated Arrival', no_ready:'No orders ready yet', gps_active:'GPS Active', gps_off:'GPS Off' },
+  ar:{ ready:'جاهز للاستلام', active:'توصيل نشط', chat:'محادثة مع العميل', accept:'قبول التوصيل', call:'اتصل بالعميل', start_gps:'بدء مشاركة الموقع', stop_gps:'إيقاف المشاركة', delivered:'تم التوصيل', eta_label:'وقت الوصول المتوقع', no_ready:'لا توجد طلبات جاهزة', gps_active:'GPS نشط', gps_off:'GPS متوقف' }
+};
+let lang='en';
+function toggleLang(){
+  lang=lang==='en'?'ar':'en';
+  document.documentElement.dir=lang==='ar'?'rtl':'ltr';
+  document.getElementById('lang-btn').textContent=lang==='en'?'عربي':'English';
+}
+
+let token=localStorage.getItem('mrwok_delivery_token');
+let currentUser=null;
+let delivMap=null, driverMarker=null, customerMarker=null, routeLine=null;
+let activeOrder=null;
+let gpsWatchId=null;
+let socket;
+
+// LOGIN
+document.getElementById('lp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+document.getElementById('btn-login').addEventListener('click',doLogin);
+
+async function doLogin(){
+  const username=document.getElementById('lu').value.trim();
+  const password=document.getElementById('lp').value;
+  if(!username||!password)return;
+  try{
+    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+    const d=await r.json();
+    if(!r.ok||d.user?.role!=='delivery'){showErr('Invalid credentials or not a delivery account');return;}
+    token=d.token; currentUser=d.user;
+    localStorage.setItem('mrwok_delivery_token',token);
+    initApp();
+  }catch{showErr('Server error');}
+}
+function showErr(msg){const e=document.getElementById('lerr');e.textContent=msg;e.style.display='block';}
+
+async function logout(){
+  stopGPS();
+  await fetch('/api/auth/logout',{method:'POST',headers:{Authorization:'Bearer '+token}}).catch(()=>{});
+  localStorage.removeItem('mrwok_delivery_token');
+  location.reload();
+}
+
+async function initApp(){
+  if(!currentUser){
+    try{
+      const r=await fetch('/api/auth/me',{headers:{Authorization:'Bearer '+token}});
+      const d=await r.json();
+      if(d.role!=='delivery'){localStorage.removeItem('mrwok_delivery_token');location.reload();return;}
+      currentUser=d;
+    }catch{localStorage.removeItem('mrwok_delivery_token');location.reload();return;}
+  }
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('user-chip').textContent=currentUser.displayName||currentUser.id;
+  initMap();
+  initSocket();
+  loadAvailability();
+  loadReadyOrders();
+  loadMyDelivery();
+  setInterval(loadReadyOrders,15000);
+}
+
+if(token)initApp();
+
+// SOCKET
+function initSocket(){
+  socket=io();
+  socket.emit('join_delivery',token);
+  socket.on('order_ready',order=>{
+    loadReadyOrders();
+    playSound();
+    showToast(`📦 New order ready: ${order.orderRef}`,'new');
+  });
+  socket.on('order_assigned',({orderRef})=>{
+    loadReadyOrders();
+  });
+  socket.on('chat_message',msg=>{
+    if(activeOrder&&msg.orderRef===activeOrder.orderRef){
+      // Skip if it's our own message (already shown optimistically)
+      if(msg.senderRole==='delivery' && msg.senderId===currentUser?.id){
+        // Update the last pending message status to delivered
+        const container=document.getElementById('chat-messages');
+        if(container){
+          const pending = container.querySelectorAll('.msg-me .msg-status');
+          const last = pending[pending.length-1];
+          if(last && last.textContent==='⏳') last.textContent='✓✓';
+        }
+        return;
+      }
+      appendChat(msg);
+    }
+  });
+}
+
+// MAP
+function initMap(){
+  delivMap=L.map('delivery-map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(delivMap);
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      delivMap.setView([pos.coords.latitude,pos.coords.longitude],14);
+    },()=>{ delivMap.setView([30.0626,31.2233],13); });
+  } else { delivMap.setView([30.0626,31.2233],13); }
+}
+
+// READY ORDERS
+async function loadReadyOrders(){
+  if(activeOrder)return;
+  const r=await fetch('/api/delivery/orders/ready',{headers:{Authorization:'Bearer '+token}});
+  const orders=await r.json();
+  const list=document.getElementById('ready-list');
+  if(!orders.length){
+    list.innerHTML=`<div class="empty"><div class="empty-icon">⏳</div><div style="font-size:13px;color:var(--muted);">${i18n[lang].no_ready}</div></div>`;
+    return;
+  }
+  list.innerHTML=orders.map(o=>`
+    <div class="ready-card">
+      <div class="ready-ref">${esc(o.orderRef)}</div>
+      <div class="ready-name">${esc(o.customerName||'Customer')}</div>
+      <div class="ready-area">${esc(o.deliveryArea||'')} ${esc(o.streetAddress||'')}</div>
+      <div class="ready-total">EGP ${(o.total||0).toFixed(0)}</div>
+      <button class="btn-accept-delivery" onclick="acceptDelivery('${esc(o.orderRef)}')">${i18n[lang].accept}</button>
+    </div>
+  `).join('');
+}
+
+// ACCEPT DELIVERY
+async function acceptDelivery(orderRef){
+  const r=await fetch(`/api/delivery/orders/${orderRef}/accept`,{method:'POST',headers:{Authorization:'Bearer '+token}});
+  if(r.ok){
+    showToast(`Order ${orderRef} accepted ✓`,'ok');
+    await loadMyDelivery();
+  } else {
+    const d=await r.json();
+    showToast(d.error||'Already taken','new');
+    loadReadyOrders();
+  }
+}
+
+// MY ACTIVE DELIVERY
+async function loadMyDelivery(){
+  const r=await fetch('/api/delivery/orders/mine',{headers:{Authorization:'Bearer '+token}});
+  const orders=await r.json();
+  if(!orders.length){ activeOrder=null; showReadyMode(); return; }
+  activeOrder=orders[0];
+  showActiveMode(activeOrder);
+  loadChat(activeOrder.orderRef);
+  if(activeOrder.customerLat&&activeOrder.customerLng){
+    showCustomerOnMap(activeOrder.customerLat,activeOrder.customerLng);
+  }
+}
+
+function showReadyMode(){
+  document.getElementById('ready-section').style.display='block';
+  document.getElementById('active-section').style.display='none';
+  document.getElementById('chat-input-row').style.display='none';
+  document.getElementById('chat-locked').style.display='block';
+}
+
+function showActiveMode(order){
+  document.getElementById('ready-section').style.display='none';
+  document.getElementById('active-section').style.display='block';
+  document.getElementById('chat-input-row').style.display='flex';
+  document.getElementById('chat-locked').style.display='none';
+
+  const items=(order.items||[]).map(i=>`<div class="active-item"><span>${esc(i.itemName)}</span><span>×${i.quantity}</span></div>`).join('');
+  const phone=order.customerPhone||'';
+
+  document.getElementById('active-delivery-content').innerHTML=`
+    <div class="active-order-card">
+      <div class="active-ref">${esc(order.orderRef)}</div>
+      <div class="active-name">${esc(order.customerName||'Customer')}</div>
+      <div class="active-address">📍 ${esc(order.deliveryArea||'')} — ${esc(order.streetAddress||'')} ${esc(order.buildingNumber||'')}</div>
+      ${order.deliveryNotes?`<div style="font-size:12px;color:var(--gold);margin-top:6px;">📝 ${esc(order.deliveryNotes)}</div>`:''}
+      <div class="active-items">${items}</div>
+      <div style="font-size:14px;font-weight:800;color:var(--accent);margin-top:10px;">EGP ${(order.total||0).toFixed(0)}</div>
+
+      ${phone?`<a class="btn-call" href="tel:${esc(phone)}">📞 ${i18n[lang].call}: ${esc(phone)}</a>`:''}
+
+      <div class="eta-box" id="eta-box">
+        <div><div class="eta-label">${i18n[lang].eta_label}</div><div class="eta-value" id="eta-val">—</div></div>
+        <div style="font-size:20px;">🛵</div>
+      </div>
+
+      <div class="gps-row">
+        <div>
+          <div class="gps-label">Live Location</div>
+          <span class="gps-badge gps-off" id="gps-status">${i18n[lang].gps_off}</span>
+        </div>
+        <button class="btn-gps btn-gps-start" id="btn-gps" onclick="toggleGPS()">${i18n[lang].start_gps}</button>
+      </div>
+
+      <button class="btn-delivered" onclick="markDelivered('${esc(order.orderRef)}')">${i18n[lang].delivered}</button>
+    </div>
+  `;
+}
+
+// GPS
+function toggleGPS(){
+  if(gpsWatchId){ stopGPS(); } else { startGPS(); }
+}
+
+function startGPS(){
+  if(!navigator.geolocation){ showToast('GPS not available','new'); return; }
+  gpsWatchId=navigator.geolocation.watchPosition(pos=>{
+    const lat=pos.coords.latitude, lng=pos.coords.longitude;
+    updateDriverOnMap(lat,lng);
+    if(activeOrder){
+      socket.emit('delivery_location',{orderRef:activeOrder.orderRef,lat,lng,token});
+      calculateETA(lat,lng);
+    }
+    document.getElementById('gps-status').textContent=i18n[lang].gps_active;
+    document.getElementById('gps-status').className='gps-badge gps-on';
+    document.getElementById('btn-gps').textContent=i18n[lang].stop_gps;
+    document.getElementById('btn-gps').className='btn-gps btn-gps-stop';
+  },{enableHighAccuracy:true,maximumAge:5000,timeout:10000});
+}
+
+function stopGPS(){
+  if(gpsWatchId){ navigator.geolocation.clearWatch(gpsWatchId); gpsWatchId=null; }
+  const sb=document.getElementById('gps-status');
+  if(sb){ sb.textContent=i18n[lang].gps_off; sb.className='gps-badge gps-off'; }
+  const bb=document.getElementById('btn-gps');
+  if(bb){ bb.textContent=i18n[lang].start_gps; bb.className='btn-gps btn-gps-start'; }
+}
+
+function updateDriverOnMap(lat,lng){
+  if(!delivMap)return;
+  const icon=L.divIcon({className:'',html:'<div style="background:#22c55e;width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);"></div>',iconSize:[16,16]});
+  if(driverMarker){ driverMarker.setLatLng([lat,lng]); }
+  else { driverMarker=L.marker([lat,lng],{icon}).addTo(delivMap).bindPopup('You'); }
+  delivMap.setView([lat,lng],15);
+  if(customerMarker) drawRoute(lat,lng);
+}
+
+function showCustomerOnMap(lat,lng){
+  if(!delivMap)return;
+  const icon=L.divIcon({className:'',html:'<div style="background:#f97316;width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);"></div>',iconSize:[16,16]});
+  if(customerMarker){ customerMarker.setLatLng([lat,lng]); }
+  else { customerMarker=L.marker([lat,lng],{icon}).addTo(delivMap).bindPopup('Customer'); }
+  if(!driverMarker) delivMap.setView([lat,lng],14);
+}
+
+function drawRoute(fromLat,fromLng){
+  if(!activeOrder||!activeOrder.customerLat)return;
+  if(routeLine){ delivMap.removeLayer(routeLine); }
+  routeLine=L.polyline([[fromLat,fromLng],[activeOrder.customerLat,activeOrder.customerLng]],{color:'#22c55e',weight:4,dashArray:'8,6'}).addTo(delivMap);
+}
+
+async function calculateETA(driverLat,driverLng){
+  if(!activeOrder?.customerLat||!activeOrder?.customerLng)return;
+  try{
+    const url=`https://router.project-osrm.org/route/v1/driving/${driverLng},${driverLat};${activeOrder.customerLng},${activeOrder.customerLat}?overview=false`;
+    const r=await fetch(url);
+    const d=await r.json();
+    if(d.routes&&d.routes[0]){
+      const secs=d.routes[0].duration;
+      const mins=Math.ceil(secs/60);
+      const etaEl=document.getElementById('eta-val');
+      if(etaEl) etaEl.textContent=`${mins} min`;
+    }
+  }catch{}
+}
+
+// MARK DELIVERED
+async function markDelivered(orderRef){
+  if(!confirm('Mark this order as delivered?'))return;
+  stopGPS();
+  const r=await fetch(`/api/delivery/orders/${orderRef}/delivered`,{method:'POST',headers:{Authorization:'Bearer '+token}});
+  if(r.ok){
+    showToast('Order delivered ✓','ok');
+    activeOrder=null;
+    if(driverMarker){delivMap.removeLayer(driverMarker);driverMarker=null;}
+    if(customerMarker){delivMap.removeLayer(customerMarker);customerMarker=null;}
+    if(routeLine){delivMap.removeLayer(routeLine);routeLine=null;}
+    document.getElementById('chat-messages').innerHTML='';
+    showReadyMode();
+    loadReadyOrders();
+  } else { showToast('Error','new'); }
+}
+
+// CHAT
+async function loadChat(orderRef){
+  try{
+    const r=await fetch(`/api/chat/${orderRef}`,{headers:{Authorization:'Bearer '+token}});
+    const msgs=await r.json();
+    const container=document.getElementById('chat-messages');
+    if(!container) return;
+    container.innerHTML='';
+    if(!msgs.length){
+      container.innerHTML='<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px 0;">No messages yet</div>';
+      return;
+    }
+    msgs.forEach(m=>appendChat(m));
+  }catch(e){ console.error('Chat load error',e); }
+}
+
+function appendChat(msg, pending=false){
+  const container=document.getElementById('chat-messages');
+  if(!container) return;
+  const isMe = msg.senderRole==='delivery';
+  const div=document.createElement('div');
+  div.className=`chat-msg ${isMe?'msg-me':'msg-other'}`;
+  if(msg.id) div.dataset.msgId = msg.id;
+  const timeStr = msg.sentAt ? new Date(msg.sentAt).toLocaleTimeString('en-EG',{hour:'2-digit',minute:'2-digit'}) : 'sending…';
+  const statusIcon = isMe ? `<span class="msg-status">${pending ? '⏳' : '✓'}</span>` : '';
+  div.innerHTML=`<div class="msg-bubble">${esc(msg.message)}</div><div class="msg-time">${isMe?'You':esc(msg.senderName||'Customer')} · ${timeStr}${statusIcon}</div>`;
+  container.appendChild(div);
+  container.scrollTop=container.scrollHeight;
+}
+
+function sendChat(){
+  if(!activeOrder)return;
+  const input=document.getElementById('chat-input');
+  const msg=input.value.trim();
+  if(!msg)return;
+  input.value='';
+  // Show immediately on delivery side (optimistic)
+  const pending = {
+    orderRef: activeOrder.orderRef,
+    message: msg,
+    senderRole: 'delivery',
+    senderId: currentUser.id,
+    senderName: currentUser.displayName||currentUser.id,
+    sentAt: new Date().toISOString(),
+  };
+  appendChat(pending, true);
+  socket.emit('chat_message',{
+    orderRef:activeOrder.orderRef,
+    message:msg,
+    senderRole:'delivery',
+    senderId:currentUser.id,
+    senderName:currentUser.displayName||currentUser.id,
+    token
+  });
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&document.activeElement===document.getElementById('chat-input')) sendChat();
+});
+
+// SOUND
+let audioCtx;
+function playSound(){
+  try{
+    audioCtx=audioCtx||new AudioContext();
+    const osc=audioCtx.createOscillator();
+    const gain=audioCtx.createGain();
+    osc.connect(gain);gain.connect(audioCtx.destination);
+    osc.frequency.value=660;gain.gain.value=0.3;
+    osc.start();osc.stop(audioCtx.currentTime+0.2);
+  }catch{}
+}
+
+function showToast(msg,type='ok'){
+  const c=document.getElementById('toasts');
+  const t=document.createElement('div');
+  t.className=`toast toast-${type}`;
+  t.textContent=msg;
+  c.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(100px)';t.style.transition='.3s';setTimeout(()=>t.remove(),300);},4500);
+}
+let isAvailable = true;
+
+async function loadAvailability(){
+  try {
+    const r = await fetch('/api/auth/availability',{headers:{Authorization:'Bearer '+token}});
+    const d = await r.json();
+    isAvailable = d.available;
+    updateAvailUI();
+  } catch {}
+}
+
+async function toggleAvailability(){
+  isAvailable = !isAvailable;
+  updateAvailUI();
+  await fetch('/api/auth/availability',{
+    method:'POST',
+    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({available:isAvailable})
+  });
+  showToast(isAvailable ? '🟢 You are now Online' : '🟡 You are On Break', isAvailable?'ok':'new');
+}
+
+function updateAvailUI(){
+  const track = document.getElementById('avail-track');
+  const label = document.getElementById('avail-label');
+  if(!track||!label) return;
+  if(isAvailable){
+    track.classList.add('on');
+    label.textContent='Online'; label.className='avail-label online';
+  } else {
+    track.classList.remove('on');
+    label.textContent='On Break'; label.className='avail-label break';
+  }
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+</script>
+</body>
+</html>

@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Mr. Wok — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{
+  --bg:#080808;--surface:#111;--surface2:#181818;--surface3:#222;
+  --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);
+  --text:#f0ede8;--muted:#888;--muted2:#555;
+  --accent:#ff4500;--accent2:#ff6a35;--gold:#ffb300;
+  --green:#22c55e;--blue:#3b82f6;--orange:#f97316;--red:#ef4444;
+  --font-display:'Syne',sans-serif;--font-body:'DM Sans',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);min-height:100vh;}
+
+/* LOGIN */
+#login-screen{
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;
+  background:radial-gradient(ellipse at 30% 50%,rgba(255,69,0,.08),transparent 60%),
+             radial-gradient(ellipse at 70% 80%,rgba(255,179,0,.05),transparent 50%),
+             var(--bg);
+}
+.login-card{
+  width:380px;padding:48px 40px;
+  background:var(--surface);border:1px solid var(--border2);border-radius:20px;
+  box-shadow:0 40px 80px rgba(0,0,0,.6);
+}
+.login-logo{font-family:var(--font-display);font-size:28px;font-weight:800;margin-bottom:8px;}
+.login-logo span{color:var(--accent);}
+.login-sub{color:var(--muted);font-size:13px;margin-bottom:32px;}
+.form-group{margin-bottom:18px;}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.form-group input{
+  width:100%;padding:12px 16px;
+  background:var(--surface2);border:1px solid var(--border2);border-radius:10px;
+  color:var(--text);font-size:14px;font-family:var(--font-body);outline:none;
+  transition:border-color .2s;
+}
+.form-group input:focus{border-color:var(--accent);}
+.btn-login{
+  width:100%;padding:13px;
+  background:var(--accent);color:#fff;
+  border:none;border-radius:10px;font-size:15px;font-weight:700;
+  font-family:var(--font-display);cursor:pointer;transition:all .2s;
+  margin-top:8px;
+}
+.btn-login:hover{background:var(--accent2);transform:translateY(-1px);}
+.login-error{color:var(--red);font-size:13px;margin-top:12px;text-align:center;display:none;}
+
+/* LAYOUT */
+#app{display:none;flex-direction:column;min-height:100vh;}
+
+/* NAV */
+nav{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:0 28px;display:flex;align-items:center;justify-content:space-between;
+  height:60px;position:sticky;top:0;z-index:200;
+}
+.nav-logo{font-family:var(--font-display);font-size:18px;font-weight:800;}
+.nav-logo span{color:var(--accent);}
+.nav-tabs{display:flex;gap:4px;}
+.nav-tab{
+  padding:7px 16px;border-radius:8px;border:none;
+  background:transparent;color:var(--muted);font-size:13px;font-weight:500;
+  font-family:var(--font-body);cursor:pointer;transition:all .2s;
+}
+.nav-tab.active,.nav-tab:hover{background:var(--surface2);color:var(--text);}
+.nav-tab.active{color:var(--accent);}
+.nav-right{display:flex;align-items:center;gap:12px;}
+.live-badge{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--green);}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+.btn-sm{padding:7px 14px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font-body);transition:all .2s;}
+.btn-accent{background:var(--accent);color:#fff;}
+.btn-accent:hover{background:var(--accent2);}
+.btn-gold{background:var(--gold);color:#111;}
+.btn-gold:hover{filter:brightness(1.1);}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn-danger{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);}
+.btn-danger:hover{background:rgba(239,68,68,.25);}
+.btn-success{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);}
+.btn-success:hover{background:rgba(34,197,94,.25);}
+
+/* LANG TOGGLE */
+.lang-btn{
+  padding:5px 12px;border-radius:20px;border:1px solid var(--border2);
+  background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;
+  transition:all .2s;
+}
+.lang-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+/* CONTENT */
+.content{flex:1;padding:24px 28px;max-width:1600px;margin:0 auto;width:100%;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px;}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:18px 20px;transition:transform .2s,border-color .2s;
+}
+.stat-card:hover{transform:translateY(-2px);border-color:var(--border2);}
+.stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.stat-val{font-family:var(--font-display);font-size:26px;font-weight:800;}
+.c-accent{color:var(--accent);} .c-gold{color:var(--gold);} .c-green{color:var(--green);}
+.c-blue{color:var(--blue);} .c-orange{color:var(--orange);}
+
+/* SECTION */
+.section-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.section-title{font-family:var(--font-display);font-size:16px;font-weight:700;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px;}
+
+/* TABLE */
+table{width:100%;border-collapse:collapse;}
+thead th{
+  background:var(--surface2);padding:11px 14px;text-align:left;
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);
+  border-bottom:1px solid var(--border);
+}
+tbody tr{border-bottom:1px solid var(--border);transition:background .15s;}
+tbody tr:hover{background:rgba(255,255,255,.02);}
+tbody td{padding:11px 14px;font-size:13px;vertical-align:middle;}
+.order-ref{font-family:monospace;font-weight:700;color:var(--gold);font-size:12px;}
+
+/* STATUS BADGE */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
+.s-PENDING{background:rgba(255,243,205,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.2);}
+.s-ACCEPTED{background:rgba(59,130,246,.12);color:#60a5fa;border:1px solid rgba(60,130,246,.2);}
+.s-READY_FOR_DELIVERY{background:rgba(249,115,22,.12);color:#fb923c;border:1px solid rgba(249,115,22,.2);}
+.s-OUT_FOR_DELIVERY{background:rgba(249,115,22,.15);color:#f97316;border:1px solid rgba(249,115,22,.3);}
+.s-DELIVERED{background:rgba(34,197,94,.12);color:#4ade80;border:1px solid rgba(34,197,94,.2);}
+.s-CANCELLED{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.2);}
+.role-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.r-cook{background:rgba(59,130,246,.15);color:#60a5fa;}
+.r-delivery{background:rgba(249,115,22,.15);color:#fb923c;}
+.r-admin{background:rgba(255,69,0,.15);color:var(--accent);}
+
+/* FILTERS */
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+.f-input{
+  background:var(--surface);border:1px solid var(--border2);color:var(--text);
+  padding:8px 14px;border-radius:10px;font-size:13px;outline:none;
+  font-family:var(--font-body);flex:1;min-width:160px;
+}
+.f-input:focus{border-color:var(--accent);}
+.f-select{
+  background:var(--surface);border:1px solid var(--border2);color:var(--text);
+  padding:8px 12px;border-radius:10px;font-size:13px;outline:none;cursor:pointer;
+  font-family:var(--font-body);
+}
+
+/* USER CARDS */
+.users-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+.user-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:18px 20px;transition:border-color .2s;
+}
+.user-card:hover{border-color:var(--border2);}
+.user-card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+.user-id{font-family:monospace;font-size:12px;color:var(--gold);font-weight:700;}
+.user-name{font-family:var(--font-display);font-size:16px;font-weight:700;margin-top:2px;}
+.user-meta{font-size:12px;color:var(--muted);margin-top:4px;}
+.user-actions{display:flex;gap:8px;margin-top:14px;}
+.inactive-overlay{opacity:.45;}
+
+/* ADD USER MODAL */
+.modal-bg{
+  position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);
+  z-index:500;display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.modal-bg.open{opacity:1;pointer-events:all;}
+.modal{
+  background:var(--surface);border:1px solid var(--border2);border-radius:18px;
+  padding:32px;width:420px;max-width:95vw;
+  transform:translateY(20px);transition:transform .2s;
+}
+.modal-bg.open .modal{transform:translateY(0);}
+.modal-title{font-family:var(--font-display);font-size:20px;font-weight:800;margin-bottom:24px;}
+.modal-close{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;}
+
+/* EMPLOYEE TABLE */
+.online-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;}
+.online{background:var(--green);animation:pulse 1.5s infinite;}
+.offline{background:var(--muted2);}
+
+/* MAP */
+#live-map{height:420px;border-radius:0 0 14px 14px;}
+
+/* ALERT TOAST */
+#alerts{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+.alert-toast{
+  background:var(--surface2);border:1px solid var(--border2);border-radius:12px;
+  padding:12px 18px;font-size:13px;font-weight:600;
+  display:flex;align-items:center;gap:10px;min-width:280px;pointer-events:all;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+  animation:slideIn .3s ease;
+}
+.alert-toast.urgent{border-left:3px solid var(--red);}
+.alert-toast.info{border-left:3px solid var(--green);}
+@keyframes slideIn{from{transform:translateX(100px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+
+/* STARS */
+.stars{color:var(--gold);font-size:13px;}
+
+/* RTL support */
+[dir="rtl"] body{font-family:'DM Sans',sans-serif;}
+[dir="rtl"] table{direction:rtl;}
+[dir="rtl"] thead th,[dir="rtl"] tbody td{text-align:right;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🍜 <span>Mr. Wok</span></div>
+    <div class="login-sub" id="login-sub">Admin Portal — Restricted Access</div>
+    <div class="form-group">
+      <label id="lbl-username">Username</label>
+      <input type="text" id="login-user" autocomplete="username"/>
+    </div>
+    <div class="form-group">
+      <label id="lbl-password">Password</label>
+      <input type="password" id="login-pass" autocomplete="current-password"/>
+    </div>
+    <button class="btn-login" id="btn-do-login">Sign In</button>
+    <div class="login-error" id="login-err">Invalid credentials</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <nav>
+    <div class="nav-logo">🍜 <span>Mr. Wok</span> Admin</div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('orders')" id="tab-orders">Orders</button>
+      <button class="nav-tab" onclick="switchTab('users')" id="tab-users">Staff</button>
+      <button class="nav-tab" onclick="switchTab('activity')" id="tab-activity">Activity</button>
+      <button class="nav-tab" onclick="switchTab('map')" id="tab-map">Live Map</button>
+      <button class="nav-tab" onclick="switchTab('reviews')" id="tab-reviews">Reviews</button>
+    </div>
+    <div class="nav-right">
+      <div class="live-badge"><div class="live-dot"></div><span>LIVE</span></div>
+      <button class="lang-btn" onclick="toggleLang()" id="lang-toggle">عربي</button>
+      <button class="btn-sm btn-gold" onclick="exportExcel()">📥 Excel</button>
+      <button class="btn-sm btn-ghost" onclick="logout()" id="btn-logout">Sign Out</button>
+    </div>
+  </nav>
+
+  <div class="content">
+
+    <!-- ORDERS TAB -->
+    <div class="tab-panel active" id="panel-orders">
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label" data-i18n="total_orders">Total Orders</div><div class="stat-val c-accent" id="s-total">0</div></div>
+        <div class="stat-card"><div class="stat-label" data-i18n="revenue">Revenue</div><div class="stat-val c-gold" id="s-rev">EGP 0</div></div>
+        <div class="stat-card"><div class="stat-label" data-i18n="avg_order">Avg Order</div><div class="stat-val" id="s-avg">EGP 0</div></div>
+        <div class="stat-card"><div class="stat-label" data-i18n="pending">Pending</div><div class="stat-val c-orange" id="s-pend">0</div></div>
+        <div class="stat-card"><div class="stat-label" data-i18n="preparing">Preparing</div><div class="stat-val c-blue" id="s-prep">0</div></div>
+        <div class="stat-card"><div class="stat-label" data-i18n="on_road">On Road</div><div class="stat-val c-orange" id="s-ofd">0</div></div>
+        <div class="stat-card"><div class="stat-label" data-i18n="delivered">Delivered</div><div class="stat-val c-green" id="s-del">0</div></div>
+        <div class="stat-card"><div class="stat-label" data-i18n="avg_rating">Avg Rating</div><div class="stat-val c-gold" id="s-rat">—</div></div>
+      </div>
+
+      <div class="filters">
+        <input class="f-input" id="order-search" placeholder="🔍  Search ref, name, phone…" oninput="filterOrders()"/>
+        <select class="f-select" id="order-status-filter" onchange="filterOrders()">
+          <option value="">All Statuses</option>
+          <option value="PENDING">Pending</option>
+          <option value="ACCEPTED">Accepted</option>
+          <option value="READY_FOR_DELIVERY">Ready</option>
+          <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
+          <option value="DELIVERED">Delivered</option>
+          <option value="CANCELLED">Cancelled</option>
+        </select>
+        <select class="f-select" id="order-type-filter" onchange="filterOrders()">
+          <option value="">All Types</option>
+          <option value="DELIVERY">Delivery</option>
+          <option value="DINE_IN">Dine-In</option>
+          <option value="TAKEAWAY">Takeaway</option>
+        </select>
+      </div>
+
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th data-i18n="th_ref">Ref</th>
+              <th data-i18n="th_time">Time</th>
+              <th data-i18n="th_customer">Customer</th>
+              <th data-i18n="th_type">Type</th>
+              <th data-i18n="th_cook">Cook</th>
+              <th data-i18n="th_driver">Driver</th>
+              <th data-i18n="th_total">Total</th>
+              <th data-i18n="th_status">Status</th>
+              <th data-i18n="th_rating">Rating</th>
+              <th data-i18n="th_action">Action</th>
+            </tr>
+          </thead>
+          <tbody id="orders-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- STAFF TAB -->
+    <div class="tab-panel" id="panel-users">
+      <div class="section-hdr">
+        <span class="section-title" data-i18n="staff_management">Staff Management</span>
+        <button class="btn-sm btn-accent" onclick="openAddUser()" id="btn-add-staff">+ Add Staff</button>
+      </div>
+
+      <div style="margin-bottom:18px;">
+        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;" data-i18n="cooks">Cooks</div>
+        <div class="users-grid" id="cooks-grid"></div>
+      </div>
+      <div>
+        <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;" data-i18n="drivers">Delivery Drivers</div>
+        <div class="users-grid" id="delivery-grid"></div>
+      </div>
+    </div>
+
+    <!-- ACTIVITY TAB -->
+    <div class="tab-panel" id="panel-activity">
+      <div class="section-hdr">
+        <span class="section-title" data-i18n="active_sessions">Active Sessions</span>
+        <button class="btn-sm btn-ghost" onclick="loadActivity()" data-i18n="refresh">↻ Refresh</button>
+      </div>
+      <div class="card" style="margin-bottom:20px;">
+        <table>
+          <thead><tr>
+            <th data-i18n="th_id">ID</th>
+            <th data-i18n="th_name">Name</th>
+            <th data-i18n="th_role">Role</th>
+            <th data-i18n="th_login_time">Login Time</th>
+            <th data-i18n="th_status">Status</th>
+          </tr></thead>
+          <tbody id="active-sessions-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="section-hdr">
+        <span class="section-title" data-i18n="session_history">Session History</span>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr>
+            <th data-i18n="th_id">ID</th>
+            <th data-i18n="th_name">Name</th>
+            <th data-i18n="th_role">Role</th>
+            <th data-i18n="th_login_time">Login</th>
+            <th data-i18n="th_logout_time">Logout</th>
+          </tr></thead>
+          <tbody id="history-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- REVIEWS TAB -->
+    <div class="tab-panel" id="panel-reviews">
+      <div class="section-hdr">
+        <span class="section-title">⭐ Customer Reviews</span>
+        <span id="reviews-avg" style="font-size:14px;color:var(--gold);font-weight:700;"></span>
+      </div>
+      <div class="card">
+        <table>
+          <thead><tr>
+            <th>Order Ref</th>
+            <th>Customer</th>
+            <th>Date</th>
+            <th>Rating</th>
+            <th>Comment</th>
+          </tr></thead>
+          <tbody id="reviews-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MAP TAB -->
+    <div class="tab-panel" id="panel-map">
+      <div class="section-hdr">
+        <span class="section-title" data-i18n="live_drivers">Live Driver Locations</span>
+        <span id="driver-count" style="font-size:13px;color:var(--muted);"></span>
+      </div>
+      <div class="card">
+        <div id="live-map"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ADD USER MODAL -->
+<div class="modal-bg" id="add-user-modal">
+  <div class="modal" style="position:relative;">
+    <button class="modal-close" onclick="closeAddUser()">✕</button>
+    <div class="modal-title" data-i18n="add_staff">Add Staff Account</div>
+    <div class="form-group">
+      <label data-i18n="role">Role</label>
+      <select class="f-select" id="new-role" style="width:100%;">
+        <option value="cook">Cook</option>
+        <option value="delivery">Delivery Driver</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label data-i18n="display_name">Display Name</label>
+      <input class="f-input" id="new-name" style="width:100%;" placeholder="e.g. Ahmed Hassan"/>
+    </div>
+    <div class="form-group">
+      <label data-i18n="username">Username / ID</label>
+      <input class="f-input" id="new-username" style="width:100%;" placeholder="e.g. ahmed.cook"/>
+    </div>
+    <div class="form-group">
+      <label data-i18n="password">Password</label>
+      <input class="f-input" type="password" id="new-password" style="width:100%;"/>
+    </div>
+    <div class="form-group">
+      <label data-i18n="phone">Phone Number</label>
+      <input class="f-input" id="new-phone" style="width:100%;" placeholder="010XXXXXXXX"/>
+    </div>
+    <div id="add-user-err" style="color:var(--red);font-size:13px;margin-bottom:12px;display:none;"></div>
+    <button class="btn-sm btn-accent" style="width:100%;padding:13px;font-size:15px;" onclick="submitAddUser()" data-i18n="create_account">Create Account</button>
+  </div>
+</div>
+
+<div id="alerts"></div>
+
+<script>
+// ── i18n ──────────────────────────────────────────
+const i18n = {
+  en: {
+    total_orders:'Total Orders',revenue:'Revenue',avg_order:'Avg Order',
+    pending:'Pending',preparing:'Preparing',on_road:'On Road',delivered:'Delivered',avg_rating:'Avg Rating',
+    th_ref:'Ref',th_time:'Time',th_customer:'Customer',th_type:'Type',th_cook:'Cook',
+    th_driver:'Driver',th_total:'Total',th_status:'Status',th_rating:'Rating',th_action:'Action',
+    th_id:'ID',th_name:'Name',th_role:'Role',th_login_time:'Login Time',th_logout_time:'Logout',
+    th_status2:'Status',staff_management:'Staff Management',cooks:'Cooks',drivers:'Delivery Drivers',
+    active_sessions:'Active Sessions',session_history:'Session History',live_drivers:'Live Driver Locations',
+    add_staff:'Add Staff Account',role:'Role',display_name:'Display Name',
+    username:'Username',password:'Password',phone:'Phone',create_account:'Create Account',
+    refresh:'↻ Refresh',sign_out:'Sign Out',
+  },
+  ar: {
+    total_orders:'إجمالي الطلبات',revenue:'الإيرادات',avg_order:'متوسط الطلب',
+    pending:'قيد الانتظار',preparing:'جارٍ التحضير',on_road:'في الطريق',delivered:'تم التوصيل',avg_rating:'متوسط التقييم',
+    th_ref:'رقم الطلب',th_time:'الوقت',th_customer:'العميل',th_type:'النوع',th_cook:'الطباخ',
+    th_driver:'السائق',th_total:'الإجمالي',th_status:'الحالة',th_rating:'التقييم',th_action:'إجراء',
+    th_id:'الرقم',th_name:'الاسم',th_role:'الدور',th_login_time:'وقت الدخول',th_logout_time:'وقت الخروج',
+    th_status2:'الحالة',staff_management:'إدارة الموظفين',cooks:'الطباخون',drivers:'عمال التوصيل',
+    active_sessions:'الجلسات النشطة',session_history:'سجل الجلسات',live_drivers:'مواقع السائقين الحية',
+    add_staff:'إضافة حساب موظف',role:'الدور',display_name:'الاسم الظاهر',
+    username:'اسم المستخدم',password:'كلمة المرور',phone:'رقم الهاتف',create_account:'إنشاء الحساب',
+    refresh:'↻ تحديث',sign_out:'تسجيل الخروج',
+  }
+};
+let lang = 'en';
+function toggleLang(){
+  lang = lang==='en'?'ar':'en';
+  document.documentElement.dir = lang==='ar'?'rtl':'ltr';
+  document.getElementById('lang-toggle').textContent = lang==='en'?'عربي':'English';
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key = el.dataset.i18n;
+    if(i18n[lang][key]) el.textContent = i18n[lang][key];
+  });
+}
+
+// ── State ─────────────────────────────────────────
+let token = localStorage.getItem('mrwok_admin_token');
+let allOrders = [];
+let usersMap = {}; // id -> {displayName, phone, role}
+let driverMarkers = {};
+let liveMap = null;
+
+// ── Login ─────────────────────────────────────────
+document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+document.getElementById('btn-do-login').addEventListener('click', doLogin);
+
+async function doLogin(){
+  const username = document.getElementById('login-user').value.trim();
+  const password = document.getElementById('login-pass').value;
+  if(!username||!password) return;
+  try {
+    const r = await fetch('/api/auth/login',{ method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password}) });
+    const d = await r.json();
+    if(!r.ok||d.role==='cook'||d.role==='delivery') { showLoginErr('Invalid credentials'); return; }
+    token = d.token;
+    localStorage.setItem('mrwok_admin_token', token);
+    initApp();
+  } catch { showLoginErr('Server error'); }
+}
+function showLoginErr(msg){ const el=document.getElementById('login-err'); el.textContent=msg; el.style.display='block'; }
+
+async function logout(){
+  await fetch('/api/auth/logout',{method:'POST',headers:{Authorization:'Bearer '+token}}).catch(()=>{});
+  localStorage.removeItem('mrwok_admin_token');
+  location.reload();
+}
+
+// ── Init ──────────────────────────────────────────
+async function initApp(){
+  // Verify token
+  try {
+    const r = await fetch('/api/auth/me',{headers:{Authorization:'Bearer '+token}});
+    const d = await r.json();
+    if(d.role !== 'admin') { localStorage.removeItem('mrwok_admin_token'); location.reload(); return; }
+  } catch { localStorage.removeItem('mrwok_admin_token'); location.reload(); return; }
+
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  initSocket();
+  await loadUsers(); // load first so usersMap is ready
+  loadOrders();
+  loadStats();
+  loadActivity();
+  setInterval(loadStats, 30000);
+  setInterval(loadActivity, 10000);
+}
+
+if(token) initApp();
+
+// ── Socket ────────────────────────────────────────
+let socket;
+function initSocket(){
+  socket = io();
+  socket.emit('join_admin', token);
+  socket.on('new_order', order => {
+    allOrders.unshift(order);
+    filterOrders();
+    loadStats();
+    showAlert(`🆕 New order ${order.orderRef} — EGP ${(order.total||0).toFixed(0)}`,'info');
+  });
+  socket.on('staff_availability', ({userId, available}) => {
+    const u = usersMap[userId];
+    showAlert(`${u?.displayName||userId} is now ${available?'🟢 Online':'🟡 On Break'}`,'info');
+    loadActivity(); // refresh immediately
+  });
+  socket.on('order_updated', ({orderRef,status}) => {
+    const o = allOrders.find(x=>x.orderRef===orderRef);
+    if(o) o.status=status;
+    filterOrders();
+    loadStats();
+  });
+  socket.on('order_rated', ({orderRef,rating,comment}) => {
+    const o = allOrders.find(x=>x.orderRef===orderRef);
+    if(o){ o.rating=rating; o.ratingComment=comment; }
+    filterOrders();
+    if(document.getElementById('panel-reviews')?.classList.contains('active')) loadReviews();
+    showAlert(`⭐ New ${rating}-star review on ${orderRef}`,'info');
+  });
+  socket.on('order_alert', ({orderRef,message}) => {
+    showAlert(message,'urgent');
+    playAlert();
+  });
+  socket.on('driver_location_update', ({orderRef,lat,lng}) => {
+    updateDriverMarker(orderRef, lat, lng);
+  });
+}
+
+// ── Orders ────────────────────────────────────────
+async function loadOrders(){
+  const r = await fetch('/api/admin/orders',{headers:{Authorization:'Bearer '+token}});
+  allOrders = await r.json();
+  filterOrders();
+}
+
+function filterOrders(){
+  const q = document.getElementById('order-search').value.toLowerCase();
+  const sf = document.getElementById('order-status-filter').value;
+  const tf = document.getElementById('order-type-filter').value;
+  const filtered = allOrders.filter(o=>{
+    const mq = !q||(o.orderRef||'').toLowerCase().includes(q)||(o.customerName||'').toLowerCase().includes(q)||(o.customerPhone||'').toLowerCase().includes(q);
+    return mq && (!sf||o.status===sf) && (!tf||o.orderType===tf);
+  });
+  const tbody = document.getElementById('orders-tbody');
+  if(!filtered.length){ tbody.innerHTML=`<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--muted);">No orders found</td></tr>`; return; }
+  tbody.innerHTML = filtered.map(o=>{
+    const time = o.createdAt ? new Date(o.createdAt).toLocaleString('en-EG',{hour12:true,hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'}) : '–';
+    // rating rendered inline in cell
+    return `<tr>
+      <td><span class="order-ref">${esc(o.orderRef)}</span></td>
+      <td style="color:var(--muted);font-size:12px;">${time}</td>
+      <td><strong>${esc(o.customerName||'–')}</strong><br/><span style="font-size:11px;color:var(--muted);">${esc(o.customerPhone||'')}</span></td>
+      <td><span style="font-size:12px;">${(o.orderType||'').replace('_',' ')}</span></td>
+      <td><span style="font-size:12px;color:var(--blue);">${o.cookId ? (usersMap[o.cookId]?.displayName||o.cookId) : '–'}</span></td>
+      <td><span style="font-size:12px;color:var(--orange);">${o.deliveryUserId ? (usersMap[o.deliveryUserId]?.displayName||o.deliveryUserId) : '–'}</span></td>
+      <td><strong>EGP ${(o.total||0).toFixed(0)}</strong></td>
+      <td><span class="badge s-${o.status||'PENDING'}">${(o.status||'').replace(/_/g,' ')}</span></td>
+      <td>
+        ${o.rating ? `
+          <div style="display:flex;flex-direction:column;gap:3px;">
+            <span style="color:var(--gold);font-size:13px;">${'★'.repeat(o.rating)}${'☆'.repeat(5-o.rating)}</span>
+            ${o.ratingComment ? `<span style="font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(o.ratingComment||'')}">${esc(o.ratingComment)}</span>` : ''}
+          </div>
+        ` : '<span style="color:var(--muted2);">–</span>'}
+      </td>
+      <td>
+        <select style="background:var(--surface2);color:var(--text);border:1px solid var(--border2);padding:4px 8px;border-radius:7px;font-size:12px;cursor:pointer;" onchange="adminSetStatus('${esc(o.orderRef)}',this.value)">
+          <option value="">—</option>
+          <option value="PENDING">Pending</option>
+          <option value="ACCEPTED">Accepted</option>
+          <option value="READY_FOR_DELIVERY">Ready</option>
+          <option value="OUT_FOR_DELIVERY">Out for Delivery</option>
+          <option value="DELIVERED">Delivered</option>
+          <option value="CANCELLED">Cancelled</option>
+        </select>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function adminSetStatus(orderRef, status){
+  if(!status) return;
+  await fetch(`/api/admin/orders/${orderRef}/status`,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({status})});
+  loadOrders();
+}
+
+// ── Stats ─────────────────────────────────────────
+async function loadStats(){
+  const r = await fetch('/api/admin/stats',{headers:{Authorization:'Bearer '+token}});
+  const { stats } = await r.json();
+  document.getElementById('s-total').textContent = stats.totalOrders||0;
+  document.getElementById('s-rev').textContent = `EGP ${(stats.totalRevenue||0).toFixed(0)}`;
+  document.getElementById('s-avg').textContent = `EGP ${(stats.avgOrderValue||0).toFixed(0)}`;
+  document.getElementById('s-pend').textContent = stats.pending||0;
+  document.getElementById('s-prep').textContent = (stats.accepted||0)+(stats.ready||0);
+  document.getElementById('s-ofd').textContent = stats.outForDelivery||0;
+  document.getElementById('s-del').textContent = stats.delivered||0;
+  document.getElementById('s-rat').textContent = stats.avgRating ? (stats.avgRating).toFixed(1)+' ★' : '—';
+}
+
+// ── Users ─────────────────────────────────────────
+async function loadUsers(){
+  const r = await fetch('/api/admin/users',{headers:{Authorization:'Bearer '+token}});
+  const users = await r.json();
+  // Build lookup map
+  usersMap = {};
+  users.forEach(u => { usersMap[u.id] = u; });
+  renderUsersGrid(users.filter(u=>u.role==='cook'),'cooks-grid');
+  renderUsersGrid(users.filter(u=>u.role==='delivery'),'delivery-grid');
+}
+
+function renderUsersGrid(users, containerId){
+  const el = document.getElementById(containerId);
+  if(!users.length){ el.innerHTML=`<div style="color:var(--muted);font-size:13px;padding:12px 0;">No accounts yet.</div>`; return; }
+  el.innerHTML = users.map(u=>`
+    <div class="user-card ${u.active?'':'inactive-overlay'}">
+      <div class="user-card-top">
+        <div>
+          <div class="user-id">${esc(u.id)}</div>
+          <div class="user-name">${esc(u.displayName||u.username)}</div>
+          <div class="user-meta">@${esc(u.username)} ${u.phone?'· '+esc(u.phone):''}</div>
+        </div>
+        <span class="badge role-badge r-${u.role}">${u.role}</span>
+      </div>
+      <div class="user-meta">Created ${new Date(u.createdAt).toLocaleDateString('en-EG')}</div>
+      <div class="user-actions">
+        <button class="btn-sm ${u.active?'btn-danger':'btn-success'}" onclick="toggleUser('${u.id}',${u.active?0:1})">
+          ${u.active?'Deactivate':'Activate'}
+        </button>
+        <button class="btn-sm btn-ghost" onclick="resetPass('${u.id}')">Reset Pass</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function toggleUser(id, active){
+  await fetch(`/api/admin/users/${id}/active`,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({active})});
+  loadUsers();
+}
+
+async function resetPass(id){
+  const pw = prompt('Enter new password:');
+  if(!pw) return;
+  await fetch(`/api/admin/users/${id}/password`,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({password:pw})});
+  showAlert('Password updated ✓','info');
+}
+
+function openAddUser(){ document.getElementById('add-user-modal').classList.add('open'); }
+function closeAddUser(){ document.getElementById('add-user-modal').classList.remove('open'); }
+
+async function submitAddUser(){
+  const role = document.getElementById('new-role').value;
+  const displayName = document.getElementById('new-name').value.trim();
+  const username = document.getElementById('new-username').value.trim();
+  const password = document.getElementById('new-password').value;
+  const phone = document.getElementById('new-phone').value.trim();
+  const errEl = document.getElementById('add-user-err');
+  errEl.style.display='none';
+  if(!username||!password||!displayName){ errEl.textContent='All fields required'; errEl.style.display='block'; return; }
+  const r = await fetch('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({role,username,password,displayName,phone})});
+  const d = await r.json();
+  if(!r.ok){ errEl.textContent=d.error||'Error'; errEl.style.display='block'; return; }
+  closeAddUser();
+  loadUsers();
+  showAlert(`Account ${d.id} created ✓`,'info');
+  ['new-name','new-username','new-password','new-phone'].forEach(id=>{ document.getElementById(id).value=''; });
+}
+
+// ── Activity ──────────────────────────────────────
+async function loadActivity(){
+  const [ar, hr] = await Promise.all([
+    fetch('/api/admin/sessions/active',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
+    fetch('/api/admin/sessions/history',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json()),
+  ]);
+
+  document.getElementById('active-sessions-tbody').innerHTML = ar.length
+    ? ar.map(s=>{
+        // available is 1 or true = Online, 0 or false = On Break
+        const isOnBreak = s.available === 0 || s.available === '0' || s.available === false;
+        const statusHtml = isOnBreak
+          ? `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(249,115,22,.12);color:#fb923c;border:1px solid rgba(249,115,22,.3);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">
+               <span style="width:7px;height:7px;border-radius:50%;background:#f97316;display:inline-block;"></span>On Break
+             </span>`
+          : `<span style="display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,.12);color:#4ade80;border:1px solid rgba(34,197,94,.3);padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">
+               <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;animation:pulse 1.5s infinite;display:inline-block;"></span>Online
+             </span>`;
+        return `<tr>
+          <td style="font-family:monospace;font-size:12px;color:var(--gold);">${esc(s.userId)}</td>
+          <td><strong>${esc(s.displayName||s.username)}</strong><br/><span style="font-size:11px;color:var(--muted);">${esc(s.phone||'')}</span></td>
+          <td><span class="badge role-badge r-${s.role}">${s.role}</span></td>
+          <td style="font-size:12px;">${new Date(s.loginAt).toLocaleString('en-EG')}</td>
+          <td>${statusHtml}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">No active sessions</td></tr>';
+
+  document.getElementById('history-tbody').innerHTML = hr.map(s=>`<tr>
+    <td style="font-family:monospace;font-size:12px;color:var(--gold);">${esc(s.userId)}</td>
+    <td>${esc(s.displayName||s.username)}</td>
+    <td><span class="badge role-badge r-${s.role}">${s.role}</span></td>
+    <td style="font-size:12px;">${new Date(s.loginAt).toLocaleString('en-EG')}</td>
+    <td style="font-size:12px;">${s.logoutAt?new Date(s.logoutAt).toLocaleString('en-EG'):'<span style="color:var(--green)">Active</span>'}</td>
+  </tr>`).join('');
+}
+
+// ── Live Map ──────────────────────────────────────
+function initMap(){
+  if(liveMap) return;
+  liveMap = L.map('live-map').setView([30.0626,31.2233],12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(liveMap);
+}
+
+function updateDriverMarker(orderRef, lat, lng){
+  if(!liveMap) return;
+  if(driverMarkers[orderRef]){
+    driverMarkers[orderRef].setLatLng([lat,lng]);
+  } else {
+    const icon = L.divIcon({ className:'', html:'<div style="background:var(--accent);width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);"></div>', iconSize:[14,14] });
+    driverMarkers[orderRef] = L.marker([lat,lng],{icon}).addTo(liveMap).bindPopup(`Driver: ${orderRef}`);
+  }
+  const count = Object.keys(driverMarkers).length;
+  document.getElementById('driver-count').textContent = `${count} active driver${count!==1?'s':''}`;
+}
+
+// ── Tabs ──────────────────────────────────────────
+function switchTab(tab){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+tab).classList.add('active');
+  document.getElementById('tab-'+tab).classList.add('active');
+  if(tab==='map') setTimeout(initMap,100);
+  if(tab==='activity') loadActivity();
+  if(tab==='reviews') loadReviews();
+}
+
+async function loadReviews(){
+  const r = await fetch('/api/admin/orders',{headers:{Authorization:'Bearer '+token}});
+  const orders = await r.json();
+  const rated = orders.filter(o=>o.rating).sort((a,b)=>new Date(b.updatedAt||b.createdAt).getTime()-new Date(a.updatedAt||a.createdAt).getTime());
+  const tbody = document.getElementById('reviews-tbody');
+  const avgEl = document.getElementById('reviews-avg');
+  if(!rated.length){
+    tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--muted);">No reviews yet</td></tr>`;
+    if(avgEl) avgEl.textContent='';
+    return;
+  }
+  const avg = (rated.reduce((s,o)=>s+o.rating,0)/rated.length).toFixed(1);
+  if(avgEl) avgEl.textContent=`Average: ${avg} ★  (${rated.length} review${rated.length!==1?'s':''})`;
+  tbody.innerHTML = rated.map(o=>`
+    <tr>
+      <td><span class="order-ref">${esc(o.orderRef)}</span></td>
+      <td><strong>${esc(o.customerName||'–')}</strong><br/><span style="font-size:11px;color:var(--muted);">${esc(o.customerPhone||'')}</span></td>
+      <td style="font-size:12px;color:var(--muted);">${o.updatedAt?new Date(o.updatedAt).toLocaleString('en-EG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'–'}</td>
+      <td><span style="color:var(--gold);font-size:15px;letter-spacing:1px;">${'★'.repeat(o.rating)}${'☆'.repeat(5-o.rating)}</span></td>
+      <td style="font-size:13px;max-width:260px;">${o.ratingComment?`<span style="color:var(--text);">"${esc(o.ratingComment)}"</span>`:'<span style="color:var(--muted2);">No comment</span>'}</td>
+    </tr>
+  `).join('');
+}
+
+// ── Export ────────────────────────────────────────
+function exportExcel(){ window.open('/api/admin/export/excel?token='+token,'_blank'); }
+
+// ── Alert/Toast ───────────────────────────────────
+function showAlert(msg, type='info'){
+  const c = document.getElementById('alerts');
+  const t = document.createElement('div');
+  t.className=`alert-toast ${type}`;
+  t.textContent=msg;
+  c.appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transform='translateX(100px)'; t.style.transition='.3s'; setTimeout(()=>t.remove(),300); },5000);
+}
+
+let audioCtx;
+function playAlert(){
+  try {
+    audioCtx = audioCtx || new AudioContext();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.frequency.value=880; gain.gain.value=0.3;
+    osc.start(); osc.stop(audioCtx.currentTime+0.3);
+  } catch {}
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>

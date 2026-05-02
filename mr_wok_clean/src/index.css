@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@theme {
+  --color-mrwok-bg: #0D0D0D;
+  --color-mrwok-card: #1A1A1A;
+  --color-mrwok-primary: #FF4500;
+  --color-mrwok-secondary: #FFB300;
+  --color-mrwok-text: #F5F0E8;
+  --color-mrwok-muted: #9E9D99;
+  --color-mrwok-green: #4CAF50;
+
+  --font-display: "Playfair Display", serif;
+  --font-body: "DM Sans", sans-serif;
+  --font-mono: "Space Mono", monospace;
+}
+
+body {
+  background-color: var(--color-mrwok-bg);
+  color: var(--color-mrwok-text);
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}
